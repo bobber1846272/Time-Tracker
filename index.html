@@ -1,0 +1,391 @@
+<title>Time Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: nette kaarten in één kolom. Donker-eerst met lichte variant (toggle),
+     plus een keuze aan accentkleuren. Alle kleuren via tokens. */
+  :root {
+    --bg: #0f1014;
+    --card: #17191f;
+    --card-2: #1e2129;
+    --line: #272b34;
+    --divider: #21242c;
+    --fg: #ebecf0;
+    --muted: #8a909c;
+    --faint: #5a606b;
+    --accent: #24c08a;
+
+    --display: "Archivo", system-ui, sans-serif;
+    --body: "Hanken Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --radius: 15px;
+    --pad: 19px;
+
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f5f6f8; --card: #ffffff; --card-2: #f0f2f5;
+      --line: #e3e6ea; --divider: #ecedf1; --fg: #191c22;
+      --muted: #6a717c; --faint: #9aa0ab; color-scheme: light;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8; --card: #ffffff; --card-2: #f0f2f5;
+    --line: #e3e6ea; --divider: #ecedf1; --fg: #191c22;
+    --muted: #6a717c; --faint: #9aa0ab; color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1014; --card: #17191f; --card-2: #1e2129;
+    --line: #272b34; --divider: #21242c; --fg: #ebecf0;
+    --muted: #8a909c; --faint: #5a606b; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 30px 56px; display: flex; flex-direction: column; gap: 16px; }
+
+  header { display: flex; align-items: center; gap: 13px; }
+  .mark { width: 40px; height: 40px; border-radius: 11px; background: var(--card-2); border: 1px solid var(--line); display: grid; place-items: center; flex-shrink: 0; }
+  .mark svg { width: 21px; height: 21px; display: block; color: var(--accent); }
+  .brand { margin-right: auto; min-width: 0; }
+  .brand h1 { font-family: var(--display); font-weight: 700; font-size: 1.36rem; letter-spacing: -0.015em; margin: 0; line-height: 1.1; }
+  .brand .sub { color: var(--muted); font-size: 0.82rem; }
+  .login { display: inline-flex; align-items: center; gap: 8px; background: var(--card); color: var(--fg); border: 1px solid var(--line); font-family: var(--body); font-weight: 500; font-size: 0.86rem; padding: 9px 14px; border-radius: 10px; cursor: pointer; transition: border-color 0.14s ease, background 0.14s ease; white-space: nowrap; }
+  .login:hover { border-color: var(--muted); background: var(--card-2); }
+  .login:active { transform: translateY(1px); }
+  .login svg { width: 16px; height: 16px; color: #8891f5; }
+  .login img.me { width: 20px; height: 20px; border-radius: 50%; }
+
+  .subbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .status { color: var(--muted); font-size: 0.8rem; display: flex; align-items: center; gap: 7px; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex-shrink: 0; }
+  .status.live::before { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .status.demo::before { background: #e0a23c; }
+
+  .appearance { display: flex; align-items: center; gap: 10px; }
+  .swatches { display: flex; gap: 7px; }
+  .sw { width: 19px; height: 19px; border-radius: 50%; background: var(--c); border: none; cursor: pointer; padding: 0; box-shadow: 0 0 0 2px var(--bg); transition: transform 0.12s ease; }
+  .sw:hover { transform: scale(1.12); }
+  .sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c); }
+  .tgl { width: 32px; height: 32px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+  .tgl:hover { color: var(--fg); border-color: var(--muted); }
+  .tgl svg { width: 16px; height: 16px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--pad); }
+  .card-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .card-title h2 { font-family: var(--display); font-weight: 600; font-size: 1rem; margin: 0; letter-spacing: -0.01em; }
+  .card-title .note { color: var(--faint); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
+  .stat { padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .stat .label { color: var(--muted); font-size: 0.69rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+  .stat .value { font-family: var(--mono); font-weight: 700; font-size: 1.32rem; letter-spacing: -0.02em; line-height: 1; }
+  .stat .value small { font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-left: 1px; }
+
+  .row { display: grid; grid-template-columns: 26px 32px 1fr auto; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid var(--divider); }
+  .row:first-of-type { border-top: none; padding-top: 2px; }
+  .row.me { background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 9px; margin-inline: -8px; padding-inline: 8px; }
+  .rank { font-family: var(--mono); font-weight: 500; font-size: 0.85rem; color: var(--faint); text-align: center; font-variant-numeric: tabular-nums; }
+  .rank.medal { font-family: var(--body); font-size: 1.02rem; }
+  .av { width: 32px; height: 32px; border-radius: 50%; background: var(--card-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--display); font-weight: 600; font-size: 0.8rem; color: var(--muted); flex-shrink: 0; overflow: hidden; }
+  .av img { width: 100%; height: 100%; object-fit: cover; }
+  .row.lead .av { border-color: var(--accent); color: var(--accent); }
+  .who { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .who .name { font-weight: 500; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; border-radius: 2px; background: var(--card-2); overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--accent); opacity: 0.5; border-radius: 2px; width: var(--w, 0%); }
+  .row.lead .bar > span { opacity: 1; }
+  .time { font-family: var(--mono); font-weight: 500; font-size: 0.92rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .row.lead .time { color: var(--accent); font-weight: 700; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .line { display: flex; align-items: center; gap: 13px; padding: 10px 0; border-top: 1px solid var(--divider); }
+  .line:first-of-type { border-top: none; padding-top: 2px; }
+  .line .dur { font-family: var(--mono); font-weight: 700; font-size: 0.98rem; color: var(--accent); white-space: nowrap; min-width: 72px; }
+  .line .meta { min-width: 0; margin-right: auto; }
+  .line .chan { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line .date { color: var(--faint); font-size: 0.76rem; }
+  .line .pair { font-weight: 500; font-size: 0.9rem; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .line .time { color: var(--fg); }
+  .empty { color: var(--faint); font-size: 0.86rem; padding: 6px 0; }
+
+  footer { color: var(--faint); font-size: 0.76rem; text-align: center; padding-top: 8px; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 150%); background: var(--card-2); border: 1px solid var(--line); color: var(--fg); padding: 11px 17px; border-radius: 10px; font-size: 0.87rem; box-shadow: 0 12px 34px rgba(0,0,0,0.45); transition: transform 0.3s cubic-bezier(0.2,0.9,0.3,1.15); z-index: 20; max-width: calc(100vw - 40px); }
+  .toast.show { transform: translate(-50%, 0); }
+
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr 1fr; } .cols { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .bar > span { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="13" r="8"></circle><path d="M12 13V9"></path><path d="M12 13l2.5 1.6"></path><path d="M9.5 2h5"></path>
+      </svg>
+    </div>
+    <div class="brand">
+      <h1>Time Tracker</h1>
+      <div class="sub">Voicekanaal-tijd op je server</div>
+    </div>
+    <button class="login" id="login">
+      <svg viewBox="0 0 24 18" fill="currentColor" aria-hidden="true"><path d="M20.3 1.6A19.8 19.8 0 0 0 15.4.2l-.3.5a14.6 14.6 0 0 1 4.3 1.4C17 .9 14.5.5 12 .5S7 .9 4.6 2.1A14.6 14.6 0 0 1 8.9.7L8.6.2A19.8 19.8 0 0 0 3.7 1.6C.9 5.7.1 9.8.5 13.8a20 20 0 0 0 6 3l.8-1.2c-.7-.3-1.3-.6-1.9-1l.5-.3c3.6 1.7 7.6 1.7 11.2 0l.5.3c-.6.4-1.2.7-1.9 1l.8 1.2a20 20 0 0 0 6-3c.5-4.7-.8-8.8-3.9-12.2ZM8.3 11.4c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm7.4 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
+      <span id="loginText">Inloggen</span>
+    </button>
+  </header>
+
+  <div class="subbar">
+    <span class="status demo" id="status">Voorbeeldgegevens — zodra de site online staat verschijnen je echte cijfers.</span>
+    <div class="appearance">
+      <div class="swatches" id="swatches">
+        <button class="sw" data-accent="#24c08a" style="--c:#24c08a" aria-label="Groen"></button>
+        <button class="sw" data-accent="#ff7a1a" style="--c:#ff7a1a" aria-label="Oranje"></button>
+        <button class="sw" data-accent="#6b74ff" style="--c:#6b74ff" aria-label="Blauw"></button>
+        <button class="sw" data-accent="#a579ff" style="--c:#a579ff" aria-label="Paars"></button>
+        <button class="sw" data-accent="#ec5a8d" style="--c:#ec5a8d" aria-label="Roze"></button>
+      </div>
+      <button class="tgl" id="theme" aria-label="Licht of donker"></button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="card stat"><span class="label">Totale tijd</span><span class="value" id="st-total">—</span></div>
+    <div class="card stat"><span class="label">Leden</span><span class="value" id="st-members">—</span></div>
+    <div class="card stat"><span class="label">Langste call</span><span class="value" id="st-longest">—</span></div>
+    <div class="card stat"><span class="label">Calls</span><span class="value" id="st-calls">—</span></div>
+  </div>
+
+  <section class="card">
+    <div class="card-title"><h2>Leaderboard</h2><span class="note">totale calltijd</span></div>
+    <div id="leaderboard"></div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <div class="card-title"><h2>Records</h2><span class="note">langste call</span></div>
+      <div id="records"></div>
+    </section>
+    <section class="card">
+      <div class="card-title"><h2>Beste duo's</h2><span class="note">samen in call</span></div>
+      <div id="duos"></div>
+    </section>
+  </div>
+
+  <footer>Time Tracker — houdt automatisch bij hoe lang je samen in de voice zit.</footer>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<!-- Supabase client (werkt op GitHub Pages; in de preview hier is externe data geblokkeerd) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* =======================================================================
+   INSTELLINGEN — vul hier je eigen Supabase-gegevens in.
+   Allebei veilig om openbaar te hebben (daar zijn ze voor gemaakt).
+   ======================================================================= */
+var CONFIG = {
+  url: "https://oidymnwztkfhaljvtcqi.supabase.co",
+  anonKey: "sb_publishable_2q2nxR8XXZ1vigQM7V7orA_4tZ-7bGo",
+  guildId: ""   // leeg laten = alle data (1 server). Vul een server-ID in om te filteren.
+};
+
+/* ---- Voorbeelddata (fallback als er nog geen live data is) ---- */
+var DEMO = {
+  users: [
+    { name: "Thomas", seconds: 512280 }, { name: "Niels", seconds: 460980 },
+    { name: "Sven", seconds: 431220 }, { name: "Daan", seconds: 339120 },
+    { name: "Luuk", seconds: 316500 }, { name: "Jesse", seconds: 257400 },
+    { name: "Milan", seconds: 230880 }, { name: "Finn", seconds: 189660 }
+  ],
+  records: [
+    { dur: 34920, chan: "algemeen", date: "28 sep 2026" },
+    { dur: 29700, chan: "gaming", date: "12 sep 2026" },
+    { dur: 25380, chan: "chill", date: "3 okt 2026" }
+  ],
+  duos: [
+    { pair: "Thomas & Niels", seconds: 318000 },
+    { pair: "Sven & Daan", seconds: 220440 },
+    { pair: "Luuk & Jesse", seconds: 172320 }
+  ],
+  stats: { total: 2737440, members: 8, longest: 34920, calls: 1204 }
+};
+
+/* ---- Helpers ---- */
+function fmt(sec) {
+  sec = Math.round(sec || 0);
+  var d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return d + "d " + h + "u";
+  if (h > 0) return h + "u " + (m < 10 ? "0" : "") + m + "m";
+  return m + "m";
+}
+function fmtStat(sec) {
+  sec = Math.round(sec || 0);
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  if (h >= 1) return h + '<small>u</small>' + (m ? m + '<small>m</small>' : '');
+  return m + '<small>m</small>';
+}
+function initial(name) { return (name || "?").trim().charAt(0).toUpperCase() || "?"; }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]; }); }
+function avatarHTML(u) {
+  if (u && u.avatar) return '<img src="' + esc(u.avatar) + '" alt="" onerror="this.remove()">';
+  return esc(initial(u && u.name));
+}
+var MEDALS = ["🥇", "🥈", "🥉"];
+
+/* ---- Rendering ---- */
+function renderLeaderboard(list, meId) {
+  var el = document.getElementById("leaderboard");
+  if (!list.length) { el.innerHTML = '<div class="empty">Nog geen calltijd bijgehouden.</div>'; return; }
+  var max = list[0].seconds || 1;
+  el.innerHTML = list.slice(0, 10).map(function (u, i) {
+    var lead = i === 0, rankCell = i < 3 ? '<span class="rank medal">' + MEDALS[i] + '</span>' : '<span class="rank">' + (i + 1) + '</span>';
+    var w = Math.max(4, Math.round((u.seconds / max) * 100));
+    var mine = meId && u.id === meId;
+    return '<div class="row' + (lead ? ' lead' : '') + (mine ? ' me' : '') + '">' +
+      rankCell +
+      '<span class="av">' + avatarHTML(u) + '</span>' +
+      '<div class="who"><span class="name">' + esc(u.name) + '</span><div class="bar"><span style="--w:' + w + '%"></span></div></div>' +
+      '<span class="time">' + fmt(u.seconds) + '</span></div>';
+  }).join("");
+}
+function renderRecords(list) {
+  var el = document.getElementById("records");
+  if (!list.length) { el.innerHTML = '<div class="empty">Nog geen calls geregistreerd.</div>'; return; }
+  el.innerHTML = list.slice(0, 3).map(function (r) {
+    return '<div class="line"><span class="dur">' + fmt(r.dur) + '</span><div class="meta"><div class="chan">#' + esc(r.chan) + '</div><div class="date">' + esc(r.date) + '</div></div></div>';
+  }).join("");
+}
+function renderDuos(list) {
+  var el = document.getElementById("duos");
+  if (!list.length) { el.innerHTML = '<div class="empty">Nog geen duo\'s.</div>'; return; }
+  el.innerHTML = list.slice(0, 3).map(function (d) {
+    return '<div class="line"><span class="pair">' + esc(d.pair) + '</span><span class="time">' + fmt(d.seconds) + '</span></div>';
+  }).join("");
+}
+function renderStats(s) {
+  document.getElementById("st-total").innerHTML = fmtStat(s.total);
+  document.getElementById("st-members").textContent = s.members;
+  document.getElementById("st-longest").innerHTML = fmtStat(s.longest);
+  document.getElementById("st-calls").textContent = s.calls.toLocaleString("nl-NL");
+}
+function animateBars() {
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll(".bar > span").forEach(function (el) {
+    var target = el.style.getPropertyValue("--w");
+    el.style.setProperty("--w", "0%");
+    el.style.transition = "width 0.8s cubic-bezier(0.2,0.8,0.2,1)";
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.style.setProperty("--w", target); }); });
+  });
+}
+function paint(data, meId) {
+  renderStats(data.stats);
+  renderLeaderboard(data.users, meId);
+  renderRecords(data.records);
+  renderDuos(data.duos);
+  animateBars();
+}
+
+/* ---- Eerst de voorbeeldweergave tonen ---- */
+paint(DEMO, null);
+
+/* ---- Datum netjes in het Nederlands ---- */
+function nlDate(epochSec) {
+  try { return new Date(epochSec * 1000).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" }); }
+  catch (e) { return ""; }
+}
+
+/* ---- Live data ophalen uit Supabase ---- */
+var client = null;
+try {
+  if (window.supabase && CONFIG.url && CONFIG.anonKey) {
+    client = window.supabase.createClient(CONFIG.url, CONFIG.anonKey);
+  }
+} catch (e) { client = null; }
+
+function guildFilter(q) { return CONFIG.guildId ? q.eq("guild_id", CONFIG.guildId) : q; }
+
+async function loadLive() {
+  if (!client) return false;
+  try {
+    var ut = await guildFilter(client.from("user_time").select("user_id,seconds").order("seconds", { ascending: false })).limit(50);
+    if (ut.error) throw ut.error;
+    var us = await guildFilter(client.from("users").select("user_id,username,avatar_url"));
+    var pt = await guildFilter(client.from("pair_time").select("user_a,user_b,seconds").order("seconds", { ascending: false })).limit(20);
+    var ca = await guildFilter(client.from("calls").select("channel_id,duration,started_at").order("duration", { ascending: false })).limit(10);
+    var ch = await guildFilter(client.from("channels").select("channel_id,name"));
+
+    var nameMap = {};
+    (us.data || []).forEach(function (r) { nameMap[r.user_id] = { name: r.username || ("Lid " + r.user_id.slice(-4)), avatar: r.avatar_url }; });
+    var chMap = {};
+    (ch.data || []).forEach(function (r) { chMap[r.channel_id] = r.name; });
+
+    var users = (ut.data || []).map(function (r) {
+      var u = nameMap[r.user_id] || { name: "Lid " + r.user_id.slice(-4), avatar: null };
+      return { id: r.user_id, name: u.name, avatar: u.avatar, seconds: Number(r.seconds) };
+    });
+    var records = (ca.data || []).map(function (r) {
+      return { dur: Number(r.duration), chan: chMap[r.channel_id] || "voice", date: nlDate(r.started_at) };
+    });
+    var duos = (pt.data || []).map(function (r) {
+      var a = nameMap[r.user_a], b = nameMap[r.user_b];
+      return { pair: (a ? a.name : "?") + " & " + (b ? b.name : "?"), seconds: Number(r.seconds) };
+    });
+    var stats = {
+      total: users.reduce(function (s, u) { return s + u.seconds; }, 0),
+      members: users.length,
+      longest: records.length ? records[0].dur : 0,
+      calls: (ca.count != null ? ca.count : (ca.data || []).length)
+    };
+    // Aantal calls echt tellen (niet beperkt tot de top 10)
+    try {
+      var cnt = await guildFilter(client.from("calls").select("id", { count: "exact", head: true }));
+      if (cnt.count != null) stats.calls = cnt.count;
+    } catch (e) {}
+
+    paint({ users: users, records: records, duos: duos, stats: stats }, window.__meId || null);
+
+    var status = document.getElementById("status");
+    status.className = "status live";
+    status.textContent = "Live — ververst automatisch";
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+loadLive();
+setInterval(loadLive, 30000); // elke 30s verversen
+
+/* ---- Thema + accent ---- */
+var root = document.documentElement;
+var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function effectiveTheme() { var t = root.getAttribute("data-theme"); if (t) return t; return (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark"; }
+var themeBtn = document.getElementById("theme");
+function paintThemeBtn() { themeBtn.innerHTML = effectiveTheme() === "dark" ? SUN : MOON; }
+var savedTheme = load("tt-theme"); if (savedTheme === "light" || savedTheme === "dark") root.setAttribute("data-theme", savedTheme);
+var savedAccent = load("tt-accent"); if (savedAccent) root.style.setProperty("--accent", savedAccent);
+paintThemeBtn();
+var swatches = document.getElementById("swatches");
+function markActive() {
+  var cur = getComputedStyle(root).getPropertyValue("--accent").trim().toLowerCase();
+  swatches.querySelectorAll(".sw").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.accent.toLowerCase() === cur ? "true" : "false"); });
+}
+swatches.addEventListener("click", function (e) { var b = e.target.closest(".sw"); if (!b) return; root.style.setProperty("--accent", b.dataset.accent); store("tt-accent", b.dataset.accent); markActive(); });
+markActive();
+themeBtn.addEventListener("click", function () { var next = effectiveTheme() === "dark" ? "light" : "dark"; root.setAttribute("data-theme", next); store("tt-theme", next); paintThemeBtn(); });
+
+/* ---- Login-knop (Discord-login koppelen we in de volgende stap) ---- */
+var toast = document.getElementById("toast"), tmr;
+document.getElementById("login").addEventListener("click", function () {
+  toast.textContent = "De Discord-login zetten we zo aan — dat is de volgende stap.";
+  toast.classList.add("show"); clearTimeout(tmr);
+  tmr = setTimeout(function () { toast.classList.remove("show"); }, 3200);
+});
+</script>
